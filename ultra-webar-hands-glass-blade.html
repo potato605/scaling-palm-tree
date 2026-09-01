@@ -1,0 +1,805 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#030816" />
+  <title>Ultra Smooth Dual Hands Glass Blade AR</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --cyan: #79f3ff;
+      --cyan2: #1ee8ff;
+      --violet: #8a7cff;
+      --text: rgba(236, 252, 255, 0.94);
+      --muted: rgba(196, 231, 242, 0.7);
+      --ok: #62ffc7;
+      --bad: #ff5c86;
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #02040b;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+    }
+
+    #stage { position: fixed; inset: 0; overflow: hidden; }
+    #camera, #three, #fx {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    #camera {
+      object-fit: cover;
+      transform: scaleX(-1);
+      opacity: 0.7;
+      filter: brightness(0.82) contrast(1.1) saturate(1.08);
+      background: #000;
+    }
+
+    #fx { z-index: 2; pointer-events: none; mix-blend-mode: screen; }
+    #three { z-index: 3; pointer-events: none; }
+
+    #grade {
+      position: absolute;
+      inset: 0;
+      z-index: 4;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 50% 48%, rgba(25, 237, 255, 0.08), transparent 32%),
+        radial-gradient(circle at 50% 50%, transparent 45%, rgba(0, 0, 0, 0.5) 78%, rgba(0, 0, 0, 0.82)),
+        linear-gradient(135deg, rgba(4, 16, 42, 0.5), rgba(0, 0, 0, 0.12) 38%, rgba(2, 5, 20, 0.58));
+    }
+
+    #scan {
+      position: absolute;
+      inset: 0;
+      z-index: 5;
+      pointer-events: none;
+      opacity: 0.12;
+      background-image: linear-gradient(rgba(140, 244, 255, 0.08) 1px, transparent 1px);
+      background-size: 100% 5px;
+      animation: scanMove 6s linear infinite;
+    }
+
+    @keyframes scanMove { from { transform: translateY(0); } to { transform: translateY(20px); } }
+
+    .hud {
+      position: absolute;
+      left: 18px;
+      top: 18px;
+      z-index: 8;
+      width: min(445px, calc(100vw - 36px));
+      padding: 14px 16px;
+      border-radius: 18px;
+      color: var(--text);
+      background: linear-gradient(145deg, rgba(5, 14, 34, 0.68), rgba(4, 8, 18, 0.44));
+      border: 1px solid rgba(121, 243, 255, 0.22);
+      box-shadow: 0 22px 60px rgba(0, 0, 0, 0.28), inset 0 0 28px rgba(121, 243, 255, 0.055);
+      backdrop-filter: blur(14px);
+      user-select: none;
+    }
+
+    .hud h1 {
+      margin: 0 0 8px;
+      font-size: 15px;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+    }
+
+    .hud p {
+      margin: 4px 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--bad);
+      box-shadow: 0 0 16px var(--bad);
+    }
+    .dot.ok { background: var(--ok); box-shadow: 0 0 16px var(--ok); }
+
+    .pill {
+      margin-left: auto;
+      padding: 2px 7px;
+      border: 1px solid rgba(121, 243, 255, 0.25);
+      border-radius: 999px;
+      color: rgba(225, 252, 255, 0.86);
+      background: rgba(121, 243, 255, 0.08);
+    }
+
+    #loader {
+      position: absolute;
+      inset: 0;
+      z-index: 9;
+      display: grid;
+      place-items: center;
+      color: var(--text);
+      background: radial-gradient(circle at center, rgba(6, 24, 48, 0.94), rgba(0, 0, 0, 0.98));
+      transition: opacity 0.45s ease, visibility 0.45s ease;
+    }
+    #loader.hide { opacity: 0; visibility: hidden; }
+
+    .card {
+      width: min(520px, calc(100vw - 40px));
+      padding: 28px;
+      border-radius: 24px;
+      text-align: center;
+      border: 1px solid rgba(121, 243, 255, 0.28);
+      background: rgba(5, 13, 30, 0.76);
+      box-shadow: 0 0 80px rgba(30, 232, 255, 0.16);
+      backdrop-filter: blur(18px);
+    }
+
+    .ring {
+      width: 82px;
+      height: 82px;
+      margin: 0 auto 18px;
+      border-radius: 50%;
+      border: 2px solid rgba(121, 243, 255, 0.3);
+      box-shadow: 0 0 28px rgba(30, 232, 255, 0.35), inset 0 0 20px rgba(138, 124, 255, 0.18);
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100%{transform:scale(.9);opacity:.55} 50%{transform:scale(1.06);opacity:1} }
+
+    .card strong { display: block; margin-bottom: 10px; font-size: 20px; }
+    .card span { color: var(--muted); font-size: 13px; line-height: 1.65; }
+
+    #error {
+      position: absolute;
+      right: 18px;
+      bottom: 18px;
+      z-index: 10;
+      width: min(540px, calc(100vw - 36px));
+      display: none;
+      padding: 14px 16px;
+      border-radius: 18px;
+      color: #ffe8ee;
+      background: rgba(58, 8, 20, 0.8);
+      border: 1px solid rgba(255, 92, 134, 0.42);
+      line-height: 1.55;
+      font-size: 13px;
+      backdrop-filter: blur(14px);
+    }
+    code { padding: 1px 5px; border-radius: 5px; background: rgba(255,255,255,.11); color: #fff; }
+  </style>
+</head>
+<body>
+  <main id="stage">
+    <video id="camera" autoplay playsinline muted></video>
+    <canvas id="fx"></canvas>
+    <canvas id="three"></canvas>
+    <div id="grade"></div>
+    <div id="scan"></div>
+
+    <section class="hud">
+      <h1>Ultra Dual-Hand Glass Blade</h1>
+      <p>性能版：MediaPipe 降频识别 + 60fps GPU 插值渲染，动作更稳。双手出现显示，握拳淡出，双手距离控制长度。</p>
+      <p>特效版：能量玻璃刃、核心光带、边缘电弧、速度辉光、丝滑残影、星尘流场。</p>
+      <div class="row"><i id="dot" class="dot"></i><span id="status">正在初始化...</span><span id="quality" class="pill">AUTO</span></div>
+    </section>
+
+    <section id="loader">
+      <div class="card">
+        <div class="ring"></div>
+        <strong>启动摄像头与手部追踪</strong>
+        <span>请允许摄像头权限。建议打开浏览器硬件加速。<br>本地启动：<code>python -m http.server 8010</code></span>
+      </div>
+    </section>
+
+    <aside id="error"></aside>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+
+  <script>
+    (() => {
+      'use strict';
+
+      const video = document.getElementById('camera');
+      const threeCanvas = document.getElementById('three');
+      const fxCanvas = document.getElementById('fx');
+      const fx = fxCanvas.getContext('2d', { alpha: true, desynchronized: true });
+      const loader = document.getElementById('loader');
+      const errorBox = document.getElementById('error');
+      const dot = document.getElementById('dot');
+      const statusText = document.getElementById('status');
+      const qualityText = document.getElementById('quality');
+
+      const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+      const lerp = (a, b, t) => a + (b - a) * t;
+      const damp = (a, b, lambda, dt) => lerp(a, b, 1 - Math.exp(-lambda * dt));
+      const dist2 = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+      const smoothstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+      const now = () => performance.now() * 0.001;
+
+      const perf = {
+        width: 1,
+        height: 1,
+        dpr: 1,
+        quality: 'high',
+        fps: 60,
+        running: false,
+        trackingBusy: false,
+        lastTrack: 0,
+        trackEvery: 42,
+        lastStatusAt: 0,
+        particles: [],
+        sparks: [],
+        ribbons: [],
+      };
+
+      const target = {
+        x: 0, y: 0, z: 0,
+        rx: 0, ry: 0, rz: 0,
+        sx: 1, sy: 1, sz: 1,
+        opacity: 0,
+        glow: 0.2,
+        speed: 0,
+        energy: 0,
+        presentUntil: 0,
+      };
+
+      const state = {
+        x: 0, y: 0, z: 0,
+        vx: 0, vy: 0, vz: 0,
+        rx: 0, ry: 0, rz: 0,
+        sx: 1, sy: 1, sz: 1,
+        opacity: 0,
+        glow: 0.2,
+        energy: 0,
+        lastPalm: null,
+        f1x: 0, f1y: 0,
+        f2x: 0, f2y: 0,
+        f3x: 0, f3y: 0,
+      };
+
+      const scene = new THREE.Scene();
+      scene.fog = new THREE.FogExp2(0x020716, 0.022);
+      const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 80);
+      camera.position.z = 9.4;
+
+      const renderer = new THREE.WebGLRenderer({
+        canvas: threeCanvas,
+        alpha: true,
+        antialias: false,
+        powerPreference: 'high-performance',
+        stencil: false,
+        depth: true,
+      });
+      renderer.setClearColor(0, 0);
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.2;
+
+      const root = new THREE.Group();
+      scene.add(root);
+
+      const glassMat = new THREE.MeshPhysicalMaterial({
+        color: 0xf6feff,
+        transparent: true,
+        opacity: 0.36,
+        roughness: 0.11,
+        metalness: 0.02,
+        transmission: 0.55,
+        thickness: 0.24,
+        ior: 1.48,
+        clearcoat: 1,
+        clearcoatRoughness: 0.05,
+        reflectivity: 0.92,
+        envMapIntensity: 1.35,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      });
+
+      const coreMat = new THREE.MeshBasicMaterial({
+        color: 0xcffbff,
+        transparent: true,
+        opacity: 0.18,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+
+      const shellMat = new THREE.MeshBasicMaterial({
+        color: 0x2eeeff,
+        transparent: true,
+        opacity: 0.08,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+
+      const edgeMat = new THREE.LineBasicMaterial({
+        color: 0x8bf7ff,
+        transparent: true,
+        opacity: 0.85,
+        blending: THREE.AdditiveBlending,
+      });
+
+      const electricMat = new THREE.LineBasicMaterial({
+        color: 0xb7fbff,
+        transparent: true,
+        opacity: 0.55,
+        blending: THREE.AdditiveBlending,
+      });
+
+      const beamGeo = makeBladeGeometry(7.2, 0.64, 0.14, 0.9);
+      const glass = new THREE.Mesh(beamGeo, glassMat);
+      const core = new THREE.Mesh(makeBladeGeometry(6.9, 0.20, 0.055, 0.78), coreMat);
+      const shell = new THREE.Mesh(makeBladeGeometry(7.65, 1.06, 0.24, 1.08), shellMat);
+      const edges = new THREE.LineSegments(new THREE.EdgesGeometry(beamGeo, 8), edgeMat);
+      const electricity = new THREE.LineSegments(makeElectricGeometry(), electricMat);
+      root.add(shell, glass, core, edges, electricity);
+      root.visible = false;
+
+      const keyLight = new THREE.DirectionalLight(0xe2fbff, 2.1);
+      keyLight.position.set(-3, 4, 5);
+      scene.add(keyLight);
+      const rimLight = new THREE.PointLight(0x28eaff, 4.2, 16, 1.7);
+      rimLight.position.set(4, -2, 4);
+      scene.add(rimLight);
+      scene.add(new THREE.HemisphereLight(0xbdf8ff, 0x06102c, 1.08));
+
+      const envTarget = new THREE.WebGLCubeRenderTarget(96, { generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter });
+      const envCam = new THREE.CubeCamera(0.1, 80, envTarget);
+      const envScene = new THREE.Scene();
+      addEnvStars(envScene);
+      envCam.update(renderer, envScene);
+      scene.environment = envTarget.texture;
+      glassMat.envMap = envTarget.texture;
+
+      const tempVec = new THREE.Vector3();
+      const tempDelta = { x: 0, y: 0, z: 0 };
+
+      function makeBladeGeometry(length, height, depth, cut) {
+        const l = length * 0.5, h = height * 0.5;
+        const s = new THREE.Shape();
+        s.moveTo(-l + cut, -h);
+        s.lineTo(l - cut, -h);
+        s.lineTo(l, -h * 0.08);
+        s.lineTo(l - cut * 0.78, h);
+        s.lineTo(-l + cut * 0.78, h);
+        s.lineTo(-l, h * 0.08);
+        s.closePath();
+        const g = new THREE.ExtrudeGeometry(s, { depth, bevelEnabled: true, bevelSize: 0.045, bevelThickness: 0.034, bevelSegments: 2, curveSegments: 1 });
+        g.center();
+        g.computeVertexNormals();
+        return g;
+      }
+
+      function makeElectricGeometry() {
+        const segments = 72;
+        const positions = new Float32Array(segments * 2 * 3);
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        return g;
+      }
+
+      function updateElectric(time, intensity) {
+        const pos = electricity.geometry.attributes.position.array;
+        const n = pos.length / 6;
+        for (let i = 0; i < n; i++) {
+          const side = i % 2 === 0 ? 1 : -1;
+          const t = i / (n - 1);
+          const x = lerp(-3.15, 3.15, t);
+          const y = side * (0.36 + Math.sin(time * 8 + i * 1.7) * 0.018 * intensity);
+          const z = 0.09 + Math.sin(time * 11 + i) * 0.014;
+          const len = (0.035 + Math.random() * 0.08) * intensity;
+          const j = i * 6;
+          pos[j] = x;
+          pos[j + 1] = y;
+          pos[j + 2] = z;
+          pos[j + 3] = x + (Math.random() - 0.5) * 0.22 * intensity;
+          pos[j + 4] = y + side * len;
+          pos[j + 5] = z;
+        }
+        electricity.geometry.attributes.position.needsUpdate = true;
+      }
+
+      function addEnvStars(container) {
+        const count = 150;
+        const positions = new Float32Array(count * 3);
+        for (let i = 0; i < count; i++) {
+          const r = 16 + Math.random() * 26;
+          const a = Math.random() * Math.PI * 2;
+          const y = (Math.random() - 0.5) * 22;
+          positions[i * 3] = Math.cos(a) * r;
+          positions[i * 3 + 1] = y;
+          positions[i * 3 + 2] = Math.sin(a) * r;
+        }
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        container.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0x8bf7ff, size: 0.16, transparent: true, opacity: 0.85 })));
+      }
+
+      function resize() {
+        perf.width = innerWidth;
+        perf.height = innerHeight;
+        perf.dpr = chooseDpr();
+        camera.aspect = perf.width / perf.height;
+        camera.updateProjectionMatrix();
+        renderer.setPixelRatio(perf.dpr);
+        renderer.setSize(perf.width, perf.height, false);
+        fxCanvas.width = Math.floor(perf.width * perf.dpr);
+        fxCanvas.height = Math.floor(perf.height * perf.dpr);
+        fxCanvas.style.width = perf.width + 'px';
+        fxCanvas.style.height = perf.height + 'px';
+        fx.setTransform(perf.dpr, 0, 0, perf.dpr, 0, 0);
+        initParticles();
+      }
+
+      function chooseDpr() {
+        const raw = devicePixelRatio || 1;
+        if (perf.quality === 'low') return Math.min(raw, 1.0);
+        if (perf.quality === 'medium') return Math.min(raw, 1.25);
+        return Math.min(raw, 1.45);
+      }
+
+      function setQuality(q) {
+        if (perf.quality === q) return;
+        perf.quality = q;
+        qualityText.textContent = q.toUpperCase();
+        perf.trackEvery = q === 'low' ? 70 : q === 'medium' ? 52 : 42;
+        resize();
+      }
+
+      function autoQuality() {
+        if (perf.fps < 42 && perf.quality !== 'low') setQuality(perf.quality === 'high' ? 'medium' : 'low');
+        if (perf.fps > 57 && perf.quality !== 'high') setQuality(perf.quality === 'low' ? 'medium' : 'high');
+      }
+
+      function setStatus(text, ok) {
+        const t = performance.now();
+        if (t - perf.lastStatusAt < 300 && text === statusText.textContent) return;
+        perf.lastStatusAt = t;
+        statusText.textContent = text;
+        dot.classList.toggle('ok', !!ok);
+      }
+
+      function fail(message) {
+        loader.classList.add('hide');
+        errorBox.style.display = 'block';
+        errorBox.innerHTML = `${message}<br><br>请用 <code>http://localhost:8010/ultra-webar-hands-glass-blade.html</code> 打开，或检查摄像头权限 / CDN / 浏览器硬件加速。`;
+        setStatus('启动失败', false);
+      }
+
+      async function startCamera() {
+        const constraints = {
+          audio: false,
+          video: {
+            facingMode: 'user',
+            width: { ideal: 960, max: 960 },
+            height: { ideal: 540, max: 540 },
+            frameRate: { ideal: 60, max: 60 },
+          },
+        };
+        try {
+          video.srcObject = await navigator.mediaDevices.getUserMedia(constraints);
+        } catch (e) {
+          video.srcObject = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        }
+        await new Promise(resolve => video.onloadedmetadata = resolve);
+        await video.play();
+      }
+
+      async function startHands() {
+        if (!window.Hands) throw new Error('MediaPipe Hands 没有加载成功，可能是网络 CDN 失败。');
+        const hands = new Hands({ locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
+        hands.setOptions({
+          maxNumHands: 2,
+          modelComplexity: 0,
+          minDetectionConfidence: 0.58,
+          minTrackingConfidence: 0.7,
+          selfieMode: true,
+        });
+        hands.onResults(onResults);
+        return hands;
+      }
+
+      function handOpen(hand) {
+        const wrist = hand[0];
+        let score = 0;
+        score += dist2(hand[8], wrist) > dist2(hand[6], wrist) * 1.11 ? 1 : 0;
+        score += dist2(hand[12], wrist) > dist2(hand[10], wrist) * 1.11 ? 1 : 0;
+        score += dist2(hand[16], wrist) > dist2(hand[14], wrist) * 1.1 ? 1 : 0;
+        score += dist2(hand[20], wrist) > dist2(hand[18], wrist) * 1.1 ? 1 : 0;
+        score += dist2(hand[4], hand[9]) > dist2(hand[3], hand[9]) * 1.04 ? 1 : 0;
+        return score / 5;
+      }
+
+      function onResults(results) {
+        const hands = results.multiHandLandmarks || [];
+        if (hands.length < 2) {
+          target.opacity = 0;
+          setStatus('等待双手同时入镜...', false);
+          return;
+        }
+
+        const h0 = hands[0], h1 = hands[1];
+        const c0 = h0[9], c1 = h1[9];
+        const centerX = (h0[0].x + h1[0].x + c0.x + c1.x) * 0.25;
+        const centerY = (h0[0].y + h1[0].y + c0.y + c1.y) * 0.25;
+        const time = now();
+
+        let speed = 0;
+        if (state.lastPalm) {
+          const dt = Math.max(0.018, time - state.lastPalm.t);
+          speed = Math.hypot(centerX - state.lastPalm.x, centerY - state.lastPalm.y) / dt;
+        }
+        state.lastPalm = { x: centerX, y: centerY, t: time };
+
+        const open = (handOpen(h0) + handOpen(h1)) * 0.5;
+        const fist = 1 - open;
+        const spread = dist2(c0, c1);
+        const wristSpread = dist2(h0[0], h1[0]);
+        const spreadN = smoothstep(0.14, 0.56, spread);
+        const show = fist < 0.62;
+
+        const rawX = (0.5 - centerX) * 8.1;
+        const rawY = (0.5 - centerY) * 4.75;
+        state.f1x = lerp(state.f1x, rawX, 0.52);
+        state.f1y = lerp(state.f1y, rawY, 0.52);
+        state.f2x = lerp(state.f2x, state.f1x, 0.38);
+        state.f2y = lerp(state.f2y, state.f1y, 0.38);
+        state.f3x = lerp(state.f3x, state.f2x, 0.3);
+        state.f3y = lerp(state.f3y, state.f2y, 0.3);
+
+        const roll = (c1.y - c0.y) * 5.2;
+        const yaw = Math.atan2(c1.y - c0.y, c1.x - c0.x) * 0.42;
+        const palmFlip = ((h0[5].y - h0[17].y) + (h1[5].y - h1[17].y)) * 2.7;
+        const z = lerp(-0.45, 0.74, smoothstep(0.12, 0.48, wristSpread)) + clamp(-(c0.z + c1.z) * 0.55, -0.18, 0.22);
+
+        target.x = state.f3x;
+        target.y = state.f3y;
+        target.z = z;
+        target.rx = clamp(palmFlip, -0.7, 0.7);
+        target.ry = clamp(yaw, -0.45, 0.45);
+        target.rz = clamp(roll, -0.74, 0.74);
+        target.sx = lerp(0.55, 2.15, spreadN);
+        target.sy = lerp(0.8, 1.08, spreadN);
+        target.sz = lerp(0.82, 1.08, spreadN);
+        target.opacity = show ? lerp(0.45, 1.0, open) : 0;
+        target.speed = damp(target.speed, speed, 8, 0.033);
+        target.glow = clamp(0.35 + speed * 0.72 + spreadN * 0.2, 0.35, 2.8);
+        target.energy = clamp(speed * 0.65 + open * 0.36, 0.15, 2.2);
+        target.presentUntil = time + 0.26;
+
+        if (show && speed > 0.82) addRibbon(target.x, target.y, target.z, target.rz, target.sx, speed);
+        if (show && speed > 1.15) addSparks(target.x, target.y, target.rz, speed);
+
+        setStatus(show ? '双手锁定：能量玻璃刃已激活' : '握拳识别：正在淡出', true);
+      }
+
+      function addRibbon(x, y, z, angle, scale, speed) {
+        const cap = perf.quality === 'low' ? 12 : perf.quality === 'medium' ? 22 : 34;
+        perf.ribbons.push({ x, y, z, angle, scale, speed, born: now(), life: 0.62 + clamp(speed, 0, 2) * 0.11 });
+        while (perf.ribbons.length > cap) perf.ribbons.shift();
+      }
+
+      function addSparks(x, y, angle, speed) {
+        const n = perf.quality === 'low' ? 2 : perf.quality === 'medium' ? 4 : 7;
+        const cap = perf.quality === 'low' ? 50 : perf.quality === 'medium' ? 90 : 150;
+        for (let i = 0; i < n; i++) {
+          const a = angle + (Math.random() - 0.5) * 1.8;
+          const v = 80 + Math.random() * 190 * clamp(speed, 0.4, 2.2);
+          perf.sparks.push({
+            x: perf.width * 0.5 + x / 8.2 * perf.width,
+            y: perf.height * 0.5 - y / 4.8 * perf.height,
+            vx: Math.cos(a) * v + (Math.random() - 0.5) * 80,
+            vy: Math.sin(a) * v + (Math.random() - 0.5) * 80,
+            born: now(),
+            life: 0.35 + Math.random() * 0.38,
+            size: 1 + Math.random() * 2.2,
+          });
+        }
+        while (perf.sparks.length > cap) perf.sparks.shift();
+      }
+
+      function initParticles() {
+        const count = perf.quality === 'low' ? 90 : perf.quality === 'medium' ? 145 : 210;
+        perf.particles = [];
+        for (let i = 0; i < count; i++) {
+          perf.particles.push({
+            x: Math.random() * perf.width,
+            y: Math.random() * perf.height,
+            z: Math.random(),
+            s: 0.35 + Math.random() * 1.6,
+            p: Math.random() * Math.PI * 2,
+            v: 4 + Math.random() * 18,
+          });
+        }
+      }
+
+      function worldToScreen(x, y, z) {
+        tempVec.set(x, y, z).project(camera);
+        return { x: (tempVec.x * 0.5 + 0.5) * perf.width, y: (-tempVec.y * 0.5 + 0.5) * perf.height };
+      }
+
+      function drawFx(time, dt) {
+        fx.clearRect(0, 0, perf.width, perf.height);
+        fx.globalCompositeOperation = 'screen';
+
+        for (const p of perf.particles) {
+          p.y -= p.v * dt * (0.25 + p.z);
+          p.x += Math.sin(time * 0.22 + p.p) * dt * (5 + p.z * 7);
+          if (p.y < -8) { p.y = perf.height + 8; p.x = Math.random() * perf.width; }
+          const a = (0.025 + p.z * 0.085) * (0.65 + 0.35 * Math.sin(time + p.p));
+          fx.fillStyle = `rgba(120,242,255,${a})`;
+          fx.beginPath(); fx.arc(p.x, p.y, p.s * (0.7 + p.z), 0, Math.PI * 2); fx.fill();
+        }
+
+        const tNow = now();
+        perf.ribbons = perf.ribbons.filter(r => tNow - r.born < r.life);
+        for (const r of perf.ribbons) {
+          const age = tNow - r.born;
+          const k = age / r.life;
+          const pt = worldToScreen(r.x, r.y, r.z);
+          const length = (340 + r.speed * 96) * r.scale * (1 + k * 0.36);
+          const height = 26 + (1 - k) * 42;
+          const alpha = (1 - k) * clamp(0.2 + r.speed * 0.16, 0.18, 0.65);
+          fx.save();
+          fx.translate(pt.x, pt.y);
+          fx.rotate(r.angle * 0.72);
+          fx.shadowBlur = 34 * (1 - k) + 10;
+          fx.shadowColor = `rgba(80,236,255,${alpha})`;
+          const g = fx.createLinearGradient(-length * 0.52, 0, length * 0.52, 0);
+          g.addColorStop(0, 'rgba(40,220,255,0)');
+          g.addColorStop(0.16, `rgba(60,215,255,${alpha * 0.18})`);
+          g.addColorStop(0.5, `rgba(220,253,255,${alpha})`);
+          g.addColorStop(0.78, `rgba(80,100,255,${alpha * 0.34})`);
+          g.addColorStop(1, 'rgba(40,220,255,0)');
+          fx.fillStyle = g;
+          bladePath(fx, -length * 0.5, -height * 0.5, length, height, 48);
+          fx.fill();
+          fx.restore();
+        }
+
+        perf.sparks = perf.sparks.filter(s => tNow - s.born < s.life);
+        for (const s of perf.sparks) {
+          const age = tNow - s.born;
+          const k = age / s.life;
+          s.x += s.vx * dt;
+          s.y += s.vy * dt;
+          s.vx *= Math.pow(0.9, dt * 60);
+          s.vy *= Math.pow(0.9, dt * 60);
+          fx.fillStyle = `rgba(180,250,255,${(1 - k) * 0.75})`;
+          fx.shadowBlur = 14 * (1 - k);
+          fx.shadowColor = '#75f3ff';
+          fx.beginPath(); fx.arc(s.x, s.y, s.size * (1 - k * 0.45), 0, Math.PI * 2); fx.fill();
+        }
+      }
+
+      function bladePath(ctx, x, y, w, h, cut) {
+        ctx.beginPath();
+        ctx.moveTo(x + cut, y);
+        ctx.lineTo(x + w - cut, y);
+        ctx.lineTo(x + w, y + h * 0.5);
+        ctx.lineTo(x + w - cut, y + h);
+        ctx.lineTo(x + cut, y + h);
+        ctx.lineTo(x, y + h * 0.5);
+        ctx.closePath();
+      }
+
+      function update(dt, time) {
+        const visible = target.opacity > 0.02 && now() < target.presentUntil;
+        root.visible = visible || state.opacity > 0.015;
+
+        tempDelta.x = target.x - state.x;
+        tempDelta.y = target.y - state.y;
+        tempDelta.z = target.z - state.z;
+        const stiffness = 28;
+        const friction = Math.exp(-11.8 * dt);
+        state.vx = (state.vx + tempDelta.x * stiffness * dt) * friction;
+        state.vy = (state.vy + tempDelta.y * stiffness * dt) * friction;
+        state.vz = (state.vz + tempDelta.z * stiffness * dt) * friction;
+        state.x += state.vx * dt;
+        state.y += state.vy * dt;
+        state.z += state.vz * dt;
+
+        state.rx = damp(state.rx, target.rx, 13, dt);
+        state.ry = damp(state.ry, target.ry, 13, dt);
+        state.rz = damp(state.rz, target.rz, 13, dt);
+        state.sx = damp(state.sx, target.sx, 10, dt);
+        state.sy = damp(state.sy, target.sy, 12, dt);
+        state.sz = damp(state.sz, target.sz, 12, dt);
+        state.opacity = damp(state.opacity, visible ? target.opacity : 0, 8.5, dt);
+        state.glow = damp(state.glow, visible ? target.glow : 0.15, 9, dt);
+        state.energy = damp(state.energy, target.energy, 8, dt);
+
+        root.position.set(state.x, state.y, state.z);
+        root.rotation.set(state.rx, state.ry, state.rz);
+        root.scale.set(state.sx, state.sy, state.sz);
+
+        const breath = 0.5 + 0.5 * Math.sin(time * Math.PI / 3);
+        const speedGlow = clamp(Math.hypot(state.vx, state.vy) * 0.1, 0, 1.4);
+        const glow = clamp(state.glow + speedGlow + breath * 0.15, 0.12, 3.4);
+
+        glassMat.opacity = state.opacity * (0.31 + breath * 0.07);
+        glassMat.emissive = new THREE.Color(0xa8f8ff);
+        glassMat.emissiveIntensity = state.opacity * (0.08 + glow * 0.07);
+        glassMat.roughness = clamp(0.08 + Math.abs(state.z) * 0.13, 0.08, 0.28);
+        glassMat.envMapIntensity = 1.08 + glow * 0.2;
+        coreMat.opacity = state.opacity * clamp(0.1 + glow * 0.09, 0.08, 0.36);
+        shellMat.opacity = state.opacity * clamp(0.045 + glow * 0.05, 0.03, 0.23);
+        edgeMat.opacity = state.opacity * clamp(0.48 + glow * 0.25, 0.28, 1.0);
+        electricMat.opacity = state.opacity * clamp(0.22 + glow * 0.22, 0.15, 0.95);
+        shell.scale.setScalar(1.035 + glow * 0.02);
+        core.scale.y = 1 + Math.sin(time * 5.2) * 0.08 * state.energy;
+        rimLight.intensity = 1.8 + glow * 2.1;
+        keyLight.intensity = 1.6 + breath * 0.35 + speedGlow * 0.55;
+        updateElectric(time, glow);
+      }
+
+      async function track(hands) {
+        if (!perf.running || perf.trackingBusy || !video.videoWidth) return;
+        const t = performance.now();
+        if (t - perf.lastTrack < perf.trackEvery) return;
+        perf.lastTrack = t;
+        perf.trackingBusy = true;
+        try { await hands.send({ image: video }); }
+        catch (e) { console.warn('tracking frame skipped', e); }
+        finally { perf.trackingBusy = false; }
+      }
+
+      function animate(hands) {
+        let last = performance.now();
+        function frame(t) {
+          requestAnimationFrame(frame);
+          const dt = clamp((t - last) / 1000, 0.001, 0.05);
+          last = t;
+          perf.fps = damp(perf.fps, 1 / dt, 2.5, dt);
+          track(hands);
+          update(dt, t * 0.001);
+          drawFx(t * 0.001, dt);
+          renderer.render(scene, camera);
+          if (Math.floor(t / 1800) !== Math.floor((t - dt * 1000) / 1800)) autoQuality();
+        }
+        requestAnimationFrame(frame);
+      }
+
+      async function boot() {
+        try {
+          if (!navigator.mediaDevices?.getUserMedia) throw new Error('浏览器不支持摄像头 API，请使用 Chrome 或 Edge。');
+          if (!isSecureContext && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') throw new Error('摄像头需要 localhost 或 HTTPS 安全环境。');
+          resize();
+          addEventListener('resize', resize, { passive: true });
+          setStatus('请求摄像头权限...', false);
+          await startCamera();
+          setStatus('摄像头已开启，加载手部识别...', true);
+          const hands = await startHands();
+          loader.classList.add('hide');
+          perf.running = true;
+          setStatus('请把双手放入画面中央', false);
+          animate(hands);
+        } catch (e) {
+          console.error(e);
+          fail(e.message);
+        }
+      }
+
+      boot();
+    })();
+  </script>
+</body>
+</html>
