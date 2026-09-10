@@ -144,7 +144,7 @@ void tagObstacle(Room* r, int x, int y) {
     t.obstacleLarge = true;
 }
 
-// ---------------- 12 房间构建 ----------------
+// ---------------- 6 房间构建（主线合并：12 场景 → 6 地图，剧情/怪物/道具不变） ----------------
 std::unique_ptr<World> buildWorldImpl() {
     auto world = std::make_unique<World>();
 
@@ -179,8 +179,8 @@ std::unique_ptr<World> buildWorldImpl() {
             L"进去之前我考你个基础问题。干我们这行，都绕不开《寂静的春天》。你知道它核心控诉的是什么吗？",
         };
         npc->repeatLines = {
-            L"（林阅抬了抬下巴）温室卡已经给你了。往东走，先处置温室前廊的双头煞一。",
-            L"靠近目标后按数字交互，留意屏幕底部的【任务】行和数字菜单。",
+            L"（林阅抬了抬下巴）温室卡已经给你了。往东走，先处置温室区的双头煞。",
+            L"按数字交互即可。看屏幕底部的【任务】行和数字菜单。",
         };
         npc->rewardKey = "greenhouse_card";
         npc->rewardMsg = L"【温室门禁卡】已发放——东侧防护门已解锁。";
@@ -193,47 +193,25 @@ std::unique_ptr<World> buildWorldImpl() {
     }
     world->addRoom(std::move(r0));
 
-    // ============ 1 温室前廊 ============
-    auto r1 = std::make_unique<Room>(1, L"温室前廊");
+    // ============ 1 温室区（前廊 + 培育舱 + 控制室） ============
+    auto r1 = std::make_unique<Room>(1, L"温室区");
     {
         MapBuilder mb(68, 15);
-        mb.rect('~', 8, 11, 24, 12);         // 污染水
-        mb.rect('#', 34, 2, 35, 10);         // 培养槽障碍
-        mb.put('.', 34, 7); mb.put('.', 35, 7);   // 通道
-        mb.put('C', 46, 7);
+        mb.rect('~', 8, 11, 22, 12);         // 污染水
+        mb.rect('#', 26, 2, 28, 4);          // 培养槽障碍
+        mb.rect('#', 44, 10, 48, 12);        // 废料堆
         setGrid(r1.get(), mb);
         addDoor(r1.get(), 0, 7, "exit_w", "g_0_1", "greenhouse_card", 0, L"西侧");
-        addDoor(r1.get(), 67, 7, "exit_e", "g_1_2", "", 2, L"东侧");
-        addContainer(r1.get(), 46, 7, "field_supply", L"固定净化补给", "nutrient_block", 2);
-
-        auto m1 = std::make_unique<Monster>();
-        m1->id = "shuang_1"; m1->name = L"双头煞一";
-        m1->x = 20; m1->y = 7;
-        m1->hp = m1->maxHp = 44;
-        m1->attack = 13; m1->defense = 6;
-        m1->aggroRange = 3; m1->exp = 25;
-        m1->flavor = L"两个脑袋都盯着你，喉管里发出湿漉漉的腔调。";
-        m1->weakMsg = L"双头煞一进入【基因衰弱】——现在可以净化或控制它了。";
-        r1->monsters.push_back(std::move(m1));
-
-        r1->introLines = {
-            L"温室前廊的雾气带着铁锈味。远处一排巨大的培养槽闪着故障灯，地面渗着污染水。",
-            L"靠近怪物会触发战斗——如果觉得吃力，就站在远处多观察一下它的警戒圈。",
-        };
-    }
-    world->addRoom(std::move(r1));
-
-    // ============ 2 诱变培育舱 ============
-    auto r2 = std::make_unique<Room>(2, L"诱变培育舱");
-    {
-        MapBuilder mb(68, 15);
-        mb.rect('#', 28, 3, 32, 5);          // 破损培养舱
-        mb.rect('#', 48, 10, 52, 12);        // 废料堆
-        setGrid(r2.get(), mb);
-        addDoor(r2.get(), 0, 7, "exit_w", "g_1_2", "", 1, L"西侧");
-        addDoor(r2.get(), 67, 7, "exit_e", "g_2_3", "", 3, L"东侧");
-        addGround(r2.get(), 44, 5, "sample_1", L"污染样本一", "sample_1", 1);
-        addArchive(r2.get(), 50, 8, "culture_log", L"培养日志",
+        addDoor(r1.get(), 67, 7, "exit_e", "g_1_2", "lab_permit", 2, L"东侧");
+        addArchive(r1.get(), 10, 3, "greenhouse_console", L"温室控制台",
+                   Interactable::Kind::Terminal, {
+                       L"〔温室控制台〕",
+                       L"环境读数：湿度 94%、二氧化碳异常上升、水质污染残留 3.87%。",
+                       L"植被失控：藤蔓在 72 小时内覆盖了三号苗床。",
+                       L"生态学角度：温室植物是生产者；它失控不是因为“植物太坏”，",
+                       L"而是消费者与分解者链条被污染切断——平衡崩坏，波动放大。",
+                   });
+        addArchive(r1.get(), 30, 3, "culture_log", L"培养日志",
                    Interactable::Kind::Archive, {
                        L"〔培育日志 · 项目组〕",
                        L"3月2日：厄生的细胞系出现异常增生，抑制方案全部失败。",
@@ -242,42 +220,29 @@ std::unique_ptr<World> buildWorldImpl() {
                        L"毒素会顺着食物链向顶端层层浓缩，这就是生物富集：越往上越危险。",
                        L"记得林阅的问题吗？化学杀虫剂沿食物链富集，就是《寂静的春天》的核心控诉。",
                    });
-        addContainer(r2.get(), 36, 8, "optional_crate", L"实验备用箱", "nutrient_block", 2);
+        addContainer(r1.get(), 58, 3, "field_supply", L"固定净化补给", "nutrient_block", 1);
+        addContainer(r1.get(), 20, 5, "optional_crate", L"实验备用箱", "nutrient_block", 1);
+        addGround(r1.get(), 52, 9, "sample_1", L"污染样本一", "sample_1", 1);
+
+        auto m1 = std::make_unique<Monster>();
+        m1->id = "shuang_1"; m1->name = L"双头煞一";
+        m1->x = 28; m1->y = 7;
+        m1->hp = m1->maxHp = 32;
+        m1->attack = 9; m1->defense = 5;
+        m1->aggroRange = 3; m1->exp = 25;
+        m1->flavor = L"两个脑袋都盯着你，喉管里发出湿漉漉的腔调。";
+        m1->weakMsg = L"双头煞一进入【基因衰弱】——现在可以净化或控制它了。";
+        r1->monsters.push_back(std::move(m1));
 
         auto m2 = std::make_unique<Monster>();
         m2->id = "shuang_2"; m2->name = L"双头煞二";
-        m2->x = 16; m2->y = 7;
-        m2->hp = m2->maxHp = 50;
-        m2->attack = 14; m2->defense = 7;
+        m2->x = 46; m2->y = 7;
+        m2->hp = m2->maxHp = 34;
+        m2->attack = 10; m2->defense = 6;
         m2->aggroRange = 3; m2->exp = 25;
         m2->flavor = L"它卡在破损的培育舱边缘，似乎有些害怕。";
         m2->weakMsg = L"双头煞二进入【基因衰弱】——它停止了挣扎，静静地看着你。";
-        r2->monsters.push_back(std::move(m2));
-
-        r2->introLines = {
-            L"一排排生物反应器像失灵的巨棺。某个舱体的玻璃后，还残留着一道模糊的抓痕。",
-        };
-    }
-    world->addRoom(std::move(r2));
-
-    // ============ 3 温室控制室 ============
-    auto r3 = std::make_unique<Room>(3, L"温室控制室");
-    {
-        MapBuilder mb(68, 15);
-        mb.rect('#', 20, 5, 28, 5);          // 控制台（上沿）
-        mb.rect('#', 20, 9, 28, 9);          // 控制台（下沿）
-        mb.rect('#', 44, 4, 50, 6);          // 服务器柜
-        setGrid(r3.get(), mb);
-        addDoor(r3.get(), 0, 7, "exit_w", "g_2_3", "", 2, L"西侧");
-        addDoor(r3.get(), 67, 7, "exit_e", "g_3_4", "lab_permit", 4, L"东侧");
-        addArchive(r3.get(), 24, 7, "greenhouse_console", L"温室控制台",
-                   Interactable::Kind::Terminal, {
-                       L"〔温室控制台〕",
-                       L"环境读数：湿度 94%、二氧化碳异常上升、水质污染残留 3.87%。",
-                       L"植被失控：藤蔓在 72 小时内覆盖了三号苗床。",
-                       L"生态学角度：温室植物是生产者；它失控不是因为“植物太坏”，",
-                       L"而是消费者与分解者链条被污染切断——平衡崩坏，波动放大。",
-                   });
+        r1->monsters.push_back(std::move(m2));
 
         auto npc = std::make_unique<NPC>();
         npc->id = "fangqing";
@@ -288,72 +253,51 @@ std::unique_ptr<World> buildWorldImpl() {
             L"（方晴从植物样本堆里抬起头，眼镜片反射着绿光）你就是署里派来的？",
             L"这里原本是最“生态”的部门——植物组。直到厄生的污染让整座温室变成了疯长的丛林。",
             L"三号苗床的藤蔓一个月长出了二十五米，我三十年的驯化标签全作废了。",
-            L"实验层在隔离走廊后面。权限我先给你，但这道题你总得答：",
+            L"实验层在温室东边。权限我先给你，但这道题你总得答：",
             L"科学家们常说我们正处于一次生物大灭绝之中——你说说，现在的情况是什么？",
         };
         npc->repeatLines = {
-            L"（方晴指了指东边）实验层权限已经给你了，隔离走廊的门能刷开了。",
+            L"（方晴指了指东边）实验层权限已经给你了，温室东侧的门能刷开了。",
         };
         npc->rewardKey = "lab_permit";
-        npc->rewardMsg = L"【实验层权限】已同步——隔离走廊东侧门已解锁。";
-        r3->npcs.push_back(std::move(npc));
+        npc->rewardMsg = L"【实验层权限】已同步——温室东侧门已解锁。";
+        r1->npcs.push_back(std::move(npc));
 
-        r3->introLines = {
-            L"控温管道在头顶低鸣。透过观测窗，你能看见走廊那头“实验层”的灰色门。",
+        r1->introLines = {
+            L"温室区的雾气带着铁锈味。培养槽闪着故障灯，地面渗着污染水，控制台在低声嗡鸣。",
+            L"方晴在控制台旁，双头煞两兄弟盘踞在前廊——样本一就在它们身后的采集位。",
         };
     }
-    world->addRoom(std::move(r3));
+    world->addRoom(std::move(r1));
 
-    // ============ 4 隔离走廊 ============
-    auto r4 = std::make_unique<Room>(4, L"隔离走廊");
+    // ============ 2 实验层（隔离走廊 + 活体实验舱 + 安保值班室） ============
+    auto r2 = std::make_unique<Room>(2, L"实验层");
     {
         MapBuilder mb(68, 15);
-        mb.rect('#', 26, 2, 27, 12);         // 中段隔断墩
-        mb.put('M', 36, 7);
-        mb.put('T', 10, 4); mb.put('T', 14, 12);   // 爪痕/血迹调查点（Landmark）
-        setGrid(r4.get(), mb);
-        addDoor(r4.get(), 0, 7, "exit_w", "g_3_4", "lab_permit", 3, L"西侧");
-        addDoor(r4.get(), 67, 7, "exit_e", "g_4_5", "", 5, L"东侧");
-        addArchive(r4.get(), 10, 4, "claw_marks", L"墙面爪痕",
+        mb.rect('#', 24, 3, 28, 5);          // 实验舱障碍
+        mb.rect('*', 44, 12, 56, 13);        // 碎玻璃
+        setGrid(r2.get(), mb);
+        addDoor(r2.get(), 0, 7, "exit_w", "g_1_2", "lab_permit", 1, L"西侧");
+        addDoor(r2.get(), 67, 7, "exit_e", "g_2_3", "farm_key", 3, L"东侧");
+        addArchive(r2.get(), 14, 3, "monitor_log", L"监控记录",
+                   Interactable::Kind::Archive, {
+                       L"〔监控记录 · 安保频道〕",
+                       L"00:47 生物饲养区报告异常振动。“暂时无法定位。”",
+                       L"01:32 厄生活动区间断——之后是设备的大面积断电。",
+                       L"03:11 最后一条记录：走廊里出现大面积“转移后的残留物”。",
+                       L"记录到此中断。值班室备用的储物柜被翻得很乱。",
+                   });
+        addArchive(r2.get(), 32, 3, "claw_marks", L"墙面爪痕",
                    Interactable::Kind::Landmark, {
                        L"〔爪痕〕三道并排的深痕，从地面延伸到胸口的高度。",
                        L"痕迹边缘的金属都卷了起来——某种力量失衡的生物，心情恐怕相当糟。",
                    });
-        addArchive(r4.get(), 14, 12, "blood_mark", L"地面血迹",
+        addArchive(r2.get(), 20, 5, "blood_mark", L"地面血迹",
                    Interactable::Kind::Landmark, {
                        L"〔血迹〕已经干涸发黑，拖行方向朝东。",
                        L"旁边散落着几根焦化的纤维——是制服，不是实验服。",
                    });
-
-        auto m3 = std::make_unique<Monster>();
-        m3->id = "lieji_1"; m3->name = L"裂脊獾一";
-        m3->x = 36; m3->y = 7;
-        m3->hp = m3->maxHp = 58;
-        m3->attack = 15; m3->defense = 8;
-        m3->aggroRange = 2; m3->exp = 40;
-        m3->flavor = L"脊背的棘刺在呼吸间张开又合拢，它盯着你的鞋尖。";
-        m3->weakMsg = L"裂脊獾一进入【基因衰弱】——棘刺收起，它在发抖。";
-        r4->monsters.push_back(std::move(m3));
-
-        r4->introLines = {
-            L"走廊的灯隔两盏灭一盏，尽头传来抓挠地面的声音。",
-            L"警示板写着：警戒范围较近，长距离移动会在贴近时被打断。",
-        };
-    }
-    world->addRoom(std::move(r4));
-
-    // ============ 5 活体实验舱 ============
-    auto r5 = std::make_unique<Room>(5, L"活体实验舱");
-    {
-        MapBuilder mb(68, 15);
-        mb.rect('#', 24, 3, 26, 8);          // 实验舱障碍
-        mb.rect('*', 44, 12, 56, 13);        // 碎玻璃
-        mb.put('I', 30, 11);
-        setGrid(r5.get(), mb);
-        addDoor(r5.get(), 0, 7, "exit_w", "g_4_5", "", 4, L"西侧");
-        addDoor(r5.get(), 67, 7, "exit_e", "g_5_6", "", 6, L"东侧");
-        addGround(r5.get(), 48, 6, "sample_2", L"污染样本二", "sample_2", 1);
-        addArchive(r5.get(), 54, 9, "wolf_notes", L"灰狼改造档案",
+        addArchive(r2.get(), 46, 3, "wolf_notes", L"灰狼改造档案",
                    Interactable::Kind::Archive, {
                        L"〔改造档案 · 编号 GW-14〕",
                        L"灰狼原型基因组 + 抗逆性基因 + 逆转录病毒载体。",
@@ -362,45 +306,29 @@ std::unique_ptr<World> buildWorldImpl() {
                        L"大自然从不依赖“完美个体”，它依赖多样化的种群。",
                        L"你可以净化它——但请记住，档案右侧的签名是一个真实的人。",
                    });
-        addGround(r5.get(), 30, 11, "nutrient_floor", L"生物营养块", "nutrient_block", 1);
-        tagObstacle(r5.get(), 25, 6);
+        addContainer(r2.get(), 58, 9, "storage_cabinet", L"储物柜", "nutrient_block", 1);
+        addGround(r2.get(), 52, 6, "sample_2", L"污染样本二", "sample_2", 1);
+        addGround(r2.get(), 20, 11, "nutrient_floor", L"生物营养块", "nutrient_block", 1);
+
+        auto m3 = std::make_unique<Monster>();
+        m3->id = "lieji_1"; m3->name = L"裂脊獾一";
+        m3->x = 28; m3->y = 7;
+        m3->hp = m3->maxHp = 40;
+        m3->attack = 11; m3->defense = 6;
+        m3->aggroRange = 2; m3->exp = 40;
+        m3->flavor = L"脊背的棘刺在呼吸间张开又合拢，它盯着你的鞋尖。";
+        m3->weakMsg = L"裂脊獾一进入【基因衰弱】——棘刺收起，它在发抖。";
+        r2->monsters.push_back(std::move(m3));
 
         auto m4 = std::make_unique<Monster>();
         m4->id = "lieji_2"; m4->name = L"裂脊獾二";
-        m4->x = 18; m4->y = 8;
-        m4->hp = m4->maxHp = 64;
-        m4->attack = 16; m4->defense = 9;
+        m4->x = 44; m4->y = 7;
+        m4->hp = m4->maxHp = 44;
+        m4->attack = 12; m4->defense = 7;
         m4->aggroRange = 2; m4->exp = 40;
         m4->flavor = L"它的右前爪缠着一条实验编号腕带——是被“改造”失败的那批。";
         m4->weakMsg = L"裂脊獾二进入【基因衰弱】——它侧躺下来，喉咙里发出呜咽。";
-        r5->monsters.push_back(std::move(m4));
-
-        r5->introLines = {
-            L"实验台东倒西歪，玻璃碎片在脚下泛着寒光。笼位上残留着“GW-14”的标签。",
-        };
-    }
-    world->addRoom(std::move(r5));
-
-    // ============ 6 安保值班室 ============
-    auto r6 = std::make_unique<Room>(6, L"安保值班室");
-    {
-        MapBuilder mb(68, 15);
-        mb.rect('#', 12, 5, 18, 5);          // 值班台（上沿）
-        mb.rect('#', 12, 9, 18, 9);          // 值班台（下沿）
-        mb.put('T', 26, 7);
-        mb.put('C', 32, 9);
-        setGrid(r6.get(), mb);
-        addDoor(r6.get(), 0, 7, "exit_w", "g_5_6", "", 5, L"西侧");
-        addDoor(r6.get(), 67, 7, "exit_e", "g_6_7", "farm_key", 7, L"东侧");
-        addArchive(r6.get(), 26, 7, "monitor_log", L"监控记录",
-                   Interactable::Kind::Archive, {
-                       L"〔监控记录 · 安保频道〕",
-                       L"00:47 生物饲养区报告异常振动。“暂时无法定位。”",
-                       L"01:32 厄生活动区间断——之后是设备的大面积断电。",
-                       L"03:11 最后一条记录：走廊里出现大面积“转移后的残留物”。",
-                       L"记录到此中断。值班室备用的储物柜被翻得很乱。",
-                   });
-        addContainer(r6.get(), 32, 9, "storage_cabinet", L"储物柜", "nutrient_block", 2);
+        r2->monsters.push_back(std::move(m4));
 
         auto npc = std::make_unique<NPC>();
         npc->id = "zhaocheng";
@@ -410,7 +338,7 @@ std::unique_ptr<World> buildWorldImpl() {
         npc->firstLines = {
             L"（赵诚坐在两张拼起来的椅子上，制服第二颗扣子不见了）我在安保部十年，没见过它乱成这样。",
             L"我认识饲养员小王——他是一个会每天检查饲料又无聊又认真的人。上个月他也变成了“生物”。",
-            L"饲养场在围栏区后面，钥匙可以给你，但你要小心那两只骸甲巨麋：它们冲撞起来能撞穿铁门。",
+            L"饲养场在实验层东边，钥匙可以给你，但你要小心那两只骸甲巨麋：它们冲撞起来能撞穿铁门。",
             L"路上碰到控制协议你会用到的。还有，问个常识题：",
             L"曾经数量多到可以遮天蔽日、却因为人类而彻底灭绝的北美候鸟，是哪一种？",
         };
@@ -420,91 +348,25 @@ std::unique_ptr<World> buildWorldImpl() {
         npc->rewardKey = "farm_key";
         npc->rewardKey2 = "neural_protocol";
         npc->rewardMsg = L"【饲养场钥匙】与【神经控制协议】已移交——饲养场大门已解锁。";
-        r6->npcs.push_back(std::move(npc));
+        r2->npcs.push_back(std::move(npc));
 
-        r6->introLines = {
-            L"值班室的电视屏幕被砸碎了，碎屑下面压着一盒没有拆封的午饭。",
+        r2->introLines = {
+            L"实验层的灯隔两盏灭一盏，尽头传来抓挠地面的声音。实验台东倒西歪，玻璃碎片泛着寒光。",
+            L"爪痕、血迹、改造档案散落各处——赵诚的值班室就在最西侧。",
         };
     }
-    world->addRoom(std::move(r6));
+    world->addRoom(std::move(r2));
 
-    // ============ 7 饲养场入口 ============
-    auto r7 = std::make_unique<Room>(7, L"饲养场入口");
-    {
-        MapBuilder mb(68, 15);
-        mb.rect('#', 36, 4, 38, 10);         // 大型障碍（削弱冲撞）
-        mb.put('C', 50, 8);
-        setGrid(r7.get(), mb);
-        addDoor(r7.get(), 0, 7, "exit_w", "g_6_7", "farm_key", 6, L"西侧");
-        addDoor(r7.get(), 67, 7, "exit_e", "g_7_8", "", 8, L"东侧");
-        addContainer(r7.get(), 50, 8, "feed_reserve", L"固定恢复来源", "nutrient_block", 2);
-        tagObstacle(r7.get(), 37, 6);
-        tagObstacle(r7.get(), 37, 9);
-
-        auto m5 = std::make_unique<Monster>();
-        m5->id = "haijia_1"; m5->name = L"骸甲巨麋一";
-        m5->x = 22; m5->y = 8;
-        m5->hp = m5->maxHp = 72;
-        m5->attack = 18; m5->defense = 10;
-        m5->aggroRange = 2; m5->exp = 60;
-        m5->chargable = true;
-        m5->flavor = L"骨甲像厚重的门板，它低吼着用蹄子刨地——是冲撞的前兆。";
-        m5->weakMsg = L"骸甲巨麋一进入【基因衰弱】——骨甲上出现了裂纹，它慢慢跪坐下来。现在可以净化或控制。";
-        r7->monsters.push_back(std::move(m5));
-
-        r7->introLines = {
-            L"地面的震动从脚下传上来：一、二、一、二。脚步声在走廊尽头回荡。",
-            L"提示：骸甲巨麋的冲撞很痛——大型障碍（#）可以替你挡掉一半伤害。",
-        };
-    }
-    world->addRoom(std::move(r7));
-
-    // ============ 8 破损围栏区 ============
-    auto r8 = std::make_unique<Room>(8, L"破损围栏区");
+    // ============ 3 饲养场（入口 + 围栏区 + 观察室） ============
+    auto r3 = std::make_unique<Room>(3, L"饲养场");
     {
         MapBuilder mb(68, 15);
         mb.rect('#', 18, 10, 20, 12);        // 倒塌围栏
-        mb.put('T', 42, 10);
-        setGrid(r8.get(), mb);
-        addDoor(r8.get(), 0, 7, "exit_w", "g_7_8", "", 7, L"西侧");
-        addDoor(r8.get(), 67, 7, "exit_e", "g_8_9", "", 9, L"东侧");
-        addGround(r8.get(), 52, 9, "sample_3", L"污染样本三", "sample_3", 1);
-        addArchive(r8.get(), 42, 10, "control_terminal", L"控制终端",
-                   Interactable::Kind::Terminal, {
-                       L"〔围栏区控制终端〕",
-                       L"围栏完整度：31%。报警记录：7 次越界。",
-                       L"这里是普通生物处置区的最后一站——双头煞、裂脊獾、骸甲巨麋都将在上层被报告。",
-                       L"如需净化或控制，请在基因衰弱状态（HP<35%）下操作。",
-                   });
-        tagObstacle(r8.get(), 19, 11);
-
-        auto m6 = std::make_unique<Monster>();
-        m6->id = "haijia_2"; m6->name = L"骸甲巨麋二";
-        m6->x = 32; m6->y = 8;
-        m6->hp = m6->maxHp = 80;
-        m6->attack = 19; m6->defense = 11;
-        m6->aggroRange = 2; m6->exp = 60;
-        m6->chargable = true;
-        m6->flavor = L"它挡在三号样本采集位前面，鼻息里带着硫磺味。";
-        m6->weakMsg = L"骸甲巨麋二进入【基因衰弱】——它把角抵在地上，不再动了。";
-        r8->monsters.push_back(std::move(m6));
-
-        r8->introLines = {
-            L"围栏被撕开了一个大洞，外面就是三号样本采集点。风吹过来全是干草和杂质的味道。",
-        };
-    }
-    world->addRoom(std::move(r8));
-
-    // ============ 9 生态观察室 ============
-    auto r9 = std::make_unique<Room>(9, L"生态观察室");
-    {
-        MapBuilder mb(68, 15);
-        mb.rect('#', 26, 5, 34, 5);          // 试验台（上沿）
-        mb.rect('#', 26, 9, 34, 9);          // 试验台（下沿）
-        setGrid(r9.get(), mb);
-        addDoor(r9.get(), 0, 7, "exit_w", "g_8_9", "", 8, L"西侧");
-        addDoor(r9.get(), 67, 7, "exit_e", "g_9_10", "core_permit", 10, L"东侧");
-        addArchive(r9.get(), 30, 7, "chief_notes", L"首席科学家笔记",
+        mb.rect('#', 36, 4, 38, 10);         // 大型障碍（削弱冲撞）
+        setGrid(r3.get(), mb);
+        addDoor(r3.get(), 0, 7, "exit_w", "g_2_3", "farm_key", 2, L"西侧");
+        addDoor(r3.get(), 67, 7, "exit_e", "g_3_4", "core_permit", 4, L"东侧");
+        addArchive(r3.get(), 14, 3, "chief_notes", L"首席科学家笔记",
                    Interactable::Kind::Archive, {
                        L"〔首席科学家 · 手写扫描〕",
                        L"第 47 次申请被驳回：厄生依旧无法睡眠，它在镜子里看着自己。",
@@ -513,11 +375,44 @@ std::unique_ptr<World> buildWorldImpl() {
                        L"事故那天它撞开牢笼时，我听见它在低吼——不是在示威，是在求救。",
                        L"清理员，如果你看到这段字：它既是污染源，也是实验受害者。请决定。",
                    });
+        addArchive(r3.get(), 46, 3, "control_terminal", L"控制终端",
+                   Interactable::Kind::Terminal, {
+                       L"〔围栏区控制终端〕",
+                       L"围栏完整度：31%。报警记录：7 次越界。",
+                       L"这里是普通生物处置区的最后一站——双头煞、裂脊獾、骸甲巨麋都将在上层被报告。",
+                       L"如需净化或控制，请在基因衰弱状态（HP<35%）下操作。",
+                   });
+        addContainer(r3.get(), 58, 3, "feed_reserve", L"固定恢复来源", "nutrient_block", 1);
+        addGround(r3.get(), 52, 9, "sample_3", L"污染样本三", "sample_3", 1);
+        tagObstacle(r3.get(), 37, 6);
+        tagObstacle(r3.get(), 37, 9);
+
+        auto m5 = std::make_unique<Monster>();
+        m5->id = "haijia_1"; m5->name = L"骸甲巨麋一";
+        m5->x = 26; m5->y = 7;
+        m5->hp = m5->maxHp = 52;
+        m5->attack = 13; m5->defense = 7;
+        m5->aggroRange = 2; m5->exp = 60;
+        m5->chargable = true;
+        m5->flavor = L"骨甲像厚重的门板，它低吼着用蹄子刨地——是冲撞的前兆。";
+        m5->weakMsg = L"骸甲巨麋一进入【基因衰弱】——骨甲上出现了裂纹，它慢慢跪坐下来。";
+        r3->monsters.push_back(std::move(m5));
+
+        auto m6 = std::make_unique<Monster>();
+        m6->id = "haijia_2"; m6->name = L"骸甲巨麋二";
+        m6->x = 48; m6->y = 7;
+        m6->hp = m6->maxHp = 56;
+        m6->attack = 14; m6->defense = 8;
+        m6->aggroRange = 2; m6->exp = 60;
+        m6->chargable = true;
+        m6->flavor = L"它挡在三号样本采集位前面，鼻息里带着硫磺味。";
+        m6->weakMsg = L"骸甲巨麋二进入【基因衰弱】——它把角抵在地上，不再动了。";
+        r3->monsters.push_back(std::move(m6));
 
         auto npc = std::make_unique<NPC>();
         npc->id = "chenyan";
         npc->name = L"陈砚";
-        npc->x = 16; npc->y = 7;
+        npc->x = 14; npc->y = 7;
         npc->quizIndex = 3;
         npc->firstLines = {
             L"（陈砚没有回头，他看着监测屏上的波形）你来了。我是这群人里最早反对“军用化”的。",
@@ -532,24 +427,24 @@ std::unique_ptr<World> buildWorldImpl() {
         npc->rewardKey = "retrovirus";
         npc->rewardKey2 = "core_permit";
         npc->rewardMsg = L"【逆转录净化剂】与【中央权限】已移交——中央控制区东侧门已解锁。";
-        r9->npcs.push_back(std::move(npc));
+        r3->npcs.push_back(std::move(npc));
 
-        r9->introLines = {
-            L"观察室的屏幕上，一只骨架模型被缓慢旋转着。下面的标签写着：APF-X00 / 厄生。",
+        r3->introLines = {
+            L"饲养场的围栏被撕开大洞，地面震动一、二、一、二。风吹来全是干草和杂质的味道。",
+            L"陈砚的观察室在最西侧——骸甲巨麋两只巨兽盘踞在围栏区，样本三就在它们身后。",
         };
     }
-    world->addRoom(std::move(r9));
+    world->addRoom(std::move(r3));
 
-    // ============ 10 中央控制室前厅 ============
-    auto r10 = std::make_unique<Room>(10, L"中央控制室前厅");
+    // ============ 4 中央控制室前厅 ============
+    auto r4 = std::make_unique<Room>(4, L"中央控制室前厅");
     {
         MapBuilder mb(68, 15);
         mb.rect('#', 12, 4, 18, 5);          // 休息区桌台
-        mb.put('C', 52, 7);
-        setGrid(r10.get(), mb);
-        addDoor(r10.get(), 0, 7, "exit_w", "g_9_10", "core_permit", 9, L"西侧");
-        addDoor(r10.get(), 67, 7, "exit_e", "g_10_11", "", 11, L"东侧");
-        addContainer(r10.get(), 52, 7, "final_supply", L"最终补给", "nutrient_block", 3);
+        setGrid(r4.get(), mb);
+        addDoor(r4.get(), 0, 7, "exit_w", "g_3_4", "core_permit", 3, L"西侧");
+        addDoor(r4.get(), 67, 7, "exit_e", "g_4_5", "", 5, L"东侧");
+        addContainer(r4.get(), 52, 7, "final_supply", L"最终补给", "nutrient_block", 2);
 
         auto npc = std::make_unique<NPC>();
         npc->id = "sujin";
@@ -571,152 +466,42 @@ std::unique_ptr<World> buildWorldImpl() {
         npc->repeatLines = {
             L"（全息影像重复播放指令）核心室在东侧。用你的方式终结它——然后继续活着。",
         };
-        r10->npcs.push_back(std::move(npc));
+        r4->npcs.push_back(std::move(npc));
 
-        r10->introLines = {
+        r4->introLines = {
             L"前厅的灯光自动亮起。这里没有任何普通生物：这是 BOSS 区前最后的安静。",
             L"（检查点已建立 · 生命已恢复至 60% 以上所需的补给已备妥）",
         };
     }
-    world->addRoom(std::move(r10));
+    world->addRoom(std::move(r4));
 
-    // ============ 11 嵌合核心室 ============
-    auto r11 = std::make_unique<Room>(11, L"嵌合核心室");
+    // ============ 5 嵌合核心室 ============
+    auto r5 = std::make_unique<Room>(5, L"嵌合核心室");
     {
         MapBuilder mb(68, 15);
         mb.rect('#', 30, 4, 38, 10);         // 培养舱残骸
         mb.clearRect(29, 7, 35, 7);          // 中央通道（BOSS 站位，连通西侧）
-        setGrid(r11.get(), mb);
-        addDoor(r11.get(), 0, 7, "exit_w", "g_10_11", "", 10, L"西侧");
+        setGrid(r5.get(), mb);
+        addDoor(r5.get(), 0, 7, "exit_w", "g_4_5", "", 4, L"西侧");
 
         auto boss = std::make_unique<Monster>();
         boss->id = "eps"; boss->name = L"APF-X00「厄生」";
         boss->x = 34; boss->y = 7;
-        boss->hp = boss->maxHp = 76;
-        boss->attack = 17; boss->defense = 4;
+        boss->hp = boss->maxHp = 60;
+        boss->attack = 15; boss->defense = 2;
         boss->aggroRange = 1; boss->exp = 150;
         boss->boss = true; boss->bossPhase = 1;
         boss->flavor = L"它像一座会呼吸的塔。三条不同属的肢体同时支撑着身体——两年来它从没合过眼。";
         boss->weakMsg = L"（厄生无法进入衰弱的停摆期——你必须推进三个阶段。）";
-        r11->monsters.push_back(std::move(boss));
+        r5->monsters.push_back(std::move(boss));
 
-        r11->introLines = {
+        r5->introLines = {
             L"门在身后合拢。警报灯转成红色。",
             L"厄生站在培养舱的废墟中央，比你想象的更安静——它一直在等你来。",
         };
     }
-    world->addRoom(std::move(r11));
+    world->addRoom(std::move(r5));
 
-    // 将相邻的 12 个原始房间压缩为 6 个 68×15 房间。
-    // 每一对房间共享同一张地图，但保留原有 NPC、样本、档案、怪物和门禁顺序。
-    auto mergePair = [](std::unique_ptr<Room> base, std::unique_ptr<Room> extra,
-                        int pairIndex) -> std::unique_ptr<Room> {
-        const int baseId = base->id;
-        const int extraId = extra->id;
-
-        // 带回危险地形和大型障碍，避免合并后改变战斗/探索平衡。
-        for (int y = 0; y < base->height && y < extra->height; ++y) {
-            for (int x = 0; x < base->width && x < extra->width; ++x) {
-                const Tile& src = extra->grid[y][x];
-                Tile& dst = base->grid[y][x];
-                const bool special = src.dangerous || src.obstacleLarge;
-                if (special && dst.ch == L'.') dst = src;
-            }
-        }
-
-        auto remapCoord = [pairIndex, extraId](int& x, int& y) {
-            // 共享地图中的第二区域使用不重叠的固定站位。
-            if (extraId == 1) { x = 40; y = 7; }       // 双头煞一
-            else if (extraId == 3) { x = 14; y = 10; } // 方晴/终端保持可达
-            else if (extraId == 5) { /* 原坐标已安全 */ }
-            else if (extraId == 7) { if (x == 22 && y == 8) { x = 42; y = 7; } }
-            else if (extraId == 9) { if (x == 16 && y == 7) { x = 12; y = 7; } }
-            else if (extraId == 11) { if (x == 34 && y == 7) { x = 42; y = 7; } }
-            (void)pairIndex;
-        };
-
-        auto applyTile = [](Room& r, const Interactable& it) {
-            if (!r.inBounds(it.x, it.y)) return;
-            Tile& t = r.tileAt(it.x, it.y);
-            if (it.kind == Interactable::Kind::Door) {
-                t.ch = it.unlocked ? L'D' : L'L';
-                t.passable = it.unlocked;
-                t.fg = it.unlocked ? 10 : 12;
-            } else if (it.kind == Interactable::Kind::Container ||
-                       it.kind == Interactable::Kind::Terminal ||
-                       it.kind == Interactable::Kind::Archive ||
-                       it.kind == Interactable::Kind::Landmark) {
-                t.ch = it.kind == Interactable::Kind::Container ? L'C' : L'T';
-                t.passable = false;
-                t.fg = it.kind == Interactable::Kind::Container ? 9 : 11;
-            }
-        };
-
-        auto isInternal = [baseId, extraId](const Interactable& it) {
-            return it.kind == Interactable::Kind::Door &&
-                   (it.targetRoom == baseId || it.targetRoom == extraId);
-        };
-
-        // 基础房间保留西侧出口，移除指向第二房间的内部出口。
-        for (auto it = base->interactables.begin(); it != base->interactables.end();) {
-            if (isInternal(*it) && it->targetRoom == extraId) {
-                if (base->inBounds(it->x, it->y)) {
-                    Tile& t = base->tileAt(it->x, it->y);
-                    t = Tile{}; t.ch = L'.'; t.passable = true; t.fg = 7;
-                }
-                it = base->interactables.erase(it);
-                continue;
-            }
-            if (it->kind == Interactable::Kind::Door && it->targetRoom >= 0)
-                it->targetRoom /= 2;
-            ++it;
-        }
-
-        // 第二房间移入实体和外部出口；指向基础房间的西门属于内部连接并丢弃。
-        for (auto& npc : extra->npcs) {
-            if (extraId != 11) remapCoord(npc->x, npc->y);
-            base->npcs.push_back(std::move(npc));
-        }
-        for (auto& monster : extra->monsters) {
-            remapCoord(monster->x, monster->y);
-            base->monsters.push_back(std::move(monster));
-        }
-        for (auto it = extra->interactables.begin(); it != extra->interactables.end(); ++it) {
-            if (isInternal(*it) && it->targetRoom == baseId) continue;
-            Interactable moved = *it;
-            if (moved.kind != Interactable::Kind::Door) {
-                if (extraId == 1 && moved.id == "field_supply") {
-                    moved.x = 46; moved.y = 10;
-                } else if (extraId == 3 && moved.id == "greenhouse_console") {
-                    moved.x = 24; moved.y = 7;
-                } else {
-                    remapCoord(moved.x, moved.y);
-                }
-            }
-            // 合并后第一张地图的东门承接原 0→1 的门禁逻辑。
-            if (pairIndex == 0 && moved.kind == Interactable::Kind::Door && moved.targetRoom == 2) {
-                moved.doorId = "g_0_1";
-                moved.requiredKey = "greenhouse_card";
-                moved.unlocked = false;
-            }
-            if (moved.kind == Interactable::Kind::Door && moved.targetRoom >= 0)
-                moved.targetRoom /= 2;
-            applyTile(*base, moved);
-            base->interactables.push_back(std::move(moved));
-        }
-
-        base->introLines.insert(base->introLines.end(), extra->introLines.begin(), extra->introLines.end());
-        base->name += L" · " + extra->name;
-        base->id = pairIndex;
-        return base;
-    };
-
-    std::vector<std::unique_ptr<Room>> oldRooms;
-    oldRooms.swap(world->rooms());
-    for (int pair = 0; pair < 6; ++pair) {
-        world->rooms().push_back(mergePair(std::move(oldRooms[pair * 2]),
-                                           std::move(oldRooms[pair * 2 + 1]), pair));
-    }
     return world;
 }
 
@@ -782,11 +567,9 @@ std::vector<std::wstring> GameData::endingLines(const std::string& which) {
         return {
             L"你选择了【肃清】。",
             L"高能抑制装置压制了污染核心。厄生的生命在短暂的抽搐后终止。",
-            L"污染被阻断，设施转入净化程序，警报声终于一格一格熄灭。",
-            L"你把三份样本封存进证物箱，报告上写着：风险已经终止。",
-            L"可当你回头看见培养舱残骸，才明白被终止的并不只有一个生命。",
-            L"人类把力量交给机器，再把责任交给执行者，最后用‘安全’替一切盖章。",
-            L"你在回程的飞机上把笔放了又拿起：安全，难道只能通过毁灭获得吗？",
+            L"污染被阻断。设施转入净化程序。",
+            L"你在回程的飞机上把笔放了又拿起：",
+            L"安全，难道只能通过毁灭获得吗？",
         };
     }
     if (which == "purify") {
@@ -794,23 +577,17 @@ std::vector<std::wstring> GameData::endingLines(const std::string& which) {
             L"你选择了【净化】。",
             L"逆转录净化剂沿核心静脉扩散。异常增生逐渐停止。",
             L"厄生安静下来——那是它出生以来，大概第一次不疼。",
-            L"监测曲线仍然危险，但它终于拥有了一个可以被修复的明天。",
             L"你会背上长期修复的责任：接下来的七年，你都要回来给它做疗程。",
-            L"这不是宽恕，也不是遗忘，而是承认每一份技术成果都带着人的署名。",
             L"你写下结案报告的第二行：『种下的灾，总要有人去还。』",
-            L"生态修复从来不是把世界恢复成原样，而是让生命重新拥有选择。",
         };
     }
     return {
         L"你选择了【控制】。",
         L"神经控制协议锁定了意识回路。厄生停止反抗，污染暂时受控。",
-            L"但它的基因排斥没有消失。它的痛苦没有消失。",
-            L"控制台显示污染指数下降，却没有任何一项数据能显示它是否还在做梦。",
-            L"你在备注栏留下两个字：不等于。",
-            L"控制不等于拯救，暂停灾难也不等于解决灾难。",
-            L"真正的责任不是把危险锁起来，而是追问是谁制造了这把锁。",
-            L"你带着一份未完成的报告离开：下一次打开控制室的人，必须比我们更诚实。",
-        };
+        L"但它的基因排斥没有消失。它的痛苦没有消失。",
+        L"你在备注栏留下两个字：不等于。",
+        L"——控制不等于拯救。它在等一个不会到来的结局。",
+    };
 }
 
 std::wstring GameData::quizResultText(const Question& q, bool correct) {
@@ -823,7 +600,6 @@ std::wstring GameData::quizResultText(const Question& q, bool correct) {
 
 // ---------------- 标题画面 ----------------
 const std::vector<std::wstring>& GameData::titleArt() {
-    // 原始项目字模：与参考图一致的两组块字（ECOLOGICAL / RESTRICTED）。
     static const std::vector<std::wstring> art = {
         L"    ███████╗ ██████╗  ██████╗ ██╗     ██████╗  ██████╗ ██╗ ██████╗ █████╗ ██╗",
         L"    ██╔════╝ ██╔══██╗ ██╔═══██╗██║     ██╔══██╗██╔═══██╗██║██╔════╝██╔══██╗██║",
@@ -832,23 +608,27 @@ const std::vector<std::wstring>& GameData::titleArt() {
         L"    ███████╗ ██║  ██║ ╚██████╔╝███████╗██║  ██║╚██████╔╝██║╚██████╗██║  ██║███████╗",
         L"    ╚══════╝ ╚═╝  ╚═╝  ╚═════╝ ╚══════╝╚═╝  ╚═╝ ╚═════╝ ╚═╝ ╚═════╝╚═╝  ╚═╝╚══════╝",
         L"",
-        L"       █████╗ ██████╗ ███████╗        ██████╗ ███████╗ ██████╗███████╗ ██████╗",
+        L"        █████╗ ██████╗ ███████╗        ██████╗ ███████╗ ██████╗███████╗ ██████╗",
         L"       ██╔══██╗██╔══██╗██╔════╝ ██████╗ ██╔══██╗██╔════╝██╔════╝██╔════╝██╔═══██╗",
         L"       ███████║██████╔╝███████╗ ██╔═══╝ ██████╔╝█████╗  ██║     █████╗  ██║   ██║",
         L"       ██╔══██║██╔═══╝ ╚════██║ ╚██████╗ ██╔══██╗██╔══╝  ██║     ██╔══╝  ██║   ██║",
         L"       ██║  ██║██║     ███████║  ╚═════╝ ██║  ██║███████╗╚██████╗███████╗╚██████╔╝",
         L"       ╚═╝  ╚═╝╚═╝     ╚══════╝          ╚═╝  ╚═╝╚══════╝ ╚═════╝╚══════╝ ╚═════╝",
         L"",
-        L"R E S T R I C T E D   Z O N E",
-        L"生态禁区：畸合之源",
+        L"                 ═╗  ╔═        A P F - X 0 0    ═        ═╗  ╔═",
     };
     return art;
 }
 
 const std::vector<std::wstring>& GameData::titleCaption() {
     static const std::vector<std::wstring> cap = {
-        L"阿波菲斯生态研究设施  /  一级生态禁区  /  2045",
-        L"调查员：Cleaner-07    任务状态：待启动",
+        L"",
+        L"                                   《生态禁区：畸合之源》",
+        L"                  APF-X00 · 阿波菲斯生态研究设施，一级生态禁区 · 2031年",
+        L"",
+        L"  W/A/S/D 移动  ·  数字交互  ·  Q 退出  ·  F5 存档",
+        L"",
+        L"  “安全，只能通过毁灭获得吗？” —— Cleaner-07",
     };
     return cap;
 }
@@ -878,9 +658,9 @@ const std::vector<std::wstring>& GameData::prologue() {
 const std::vector<std::wstring>& GameData::combatTutorial() {
     static const std::vector<std::wstring> lines = {
         L"【战斗教学 · 第一次遭遇】",
-        L"战斗全部用数字完成：[1]攻击 [2]净化 [3]控制 [4]使用道具 [5]防御。",
-        L"把敌人打到【基因衰弱】（HP 低于 35%）后，[2]净化或 [3]控制可直接成功；防御可让下一次伤害减半——",
-        L"当然，[1]攻击到 0 就是肃清。生命低于 30% 时，记得 [4] 使用营养块；危险时可用 [5] 防御。",
+        L"战斗全部用数字完成：[1]攻击 [2]净化 [3]控制 [4]使用道具。",
+        L"把敌人打到【基因衰弱】（HP 低于 35%）后，[2]净化或 [3]控制可直接成功——",
+        L"当然，[1]攻击到 0 就是肃清。生命低于 30% 时，记得 [4] 用生物营养块。",
     };
     return lines;
 }

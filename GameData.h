@@ -32,7 +32,7 @@ struct ScriptStep {
 };
 
 namespace GameData {
-    // 构建 6 个独立房间的完整世界（每张地图 68×15）
+    // 构建 12 个独立房间的完整世界
     std::unique_ptr<World> buildWorld();
 
     // 5 道生态题
